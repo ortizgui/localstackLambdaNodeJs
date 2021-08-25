@@ -3,15 +3,33 @@ version: '3.1'
 services:
   localstack:
     container_name: "localstack_main"
-    image: localstack/localstack
-    network_mode: bridge
+    image: localstack/localstack:0.11.6
     ports:
-      - "4566-4583:4566-4583"
+      - "4569:4569"
+      - "4575:4575"
+      - "4566:4566"
     environment:
-      - SERVICES=s3,lambda,sqs
+      - SERVICES=s3,lambda,sqs, sns
       - AWS_DEFAULT_REGION=us-east-1
       - EDGE_PORT=4566
       - DEBUG=1
     volumes:
       - "${TEMPDIR:-/tmp/localstack}:/tmp/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
+
+  aws-cli:
+    image: mesosphere/aws-cli
+    container_name: "awsCli-compose-sample"
+    environment: 
+      - AWS_ACCESS_KEY_ID=dummyaccess
+      - AWS_SECRET_ACCESS_KEY=dummysecret
+      - AWS_DEFAULT_REGION=us-east-1
+    entrypoint: /bin/sh -c
+    command: >
+      "
+        aws --no-verify-ssl sqs create-queue --queue-name local-queue --endpoint-url http://localstack:4566 --region us-east-1
+        aws --no-verify-ssl sns create-topic --name local-topic --endpoint-url http://localstack:4566 --region us-east-1
+        aws --no-verify-ssl sns subscribe --notification-endpoint http://localstack:4566/000000000/local-queue --topic-arn arn:aws:sns:us-east-1:000000000000:local-topic --protocol sqs --endpoint-url=http://localstack:4566 --region us-east-1
+      "
+    depends_on:
+      - localstack
